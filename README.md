@@ -72,34 +72,53 @@ bb-clone-py/
 │       └── admin_password.html
 └── README.md
 ```
+## 环境变量
 
-## 本地启动
+最常用的只有这几个：
+
+- `SECRET_KEY`：Flask session key。生产环境必须配置。
+- `ADMIN_PASSWORD`：首次初始化管理密码；写入数据库后，后续可在后台修改。
+- `PORT`：可选。默认 `5000`。
+
+其他可选项：
+
+- `SITE_URL`：生成 RSS 绝对链接时优先使用的站点地址，例如 `https://example.com`。
+- `API_BASE`：可选。用于把首页里的 `/api/*` 请求前缀指向别的路径前缀。
+- `CORS_ORIGINS`：可选。逗号分隔的允许跨域来源列表，例如 `https://site-a.com,https://site-b.com`。
+- `SESSION_COOKIE_SECURE`：可选。设为 `true` / `1` / `yes` 时，仅通过 HTTPS 发送 session cookie。
+
+## 运行 / 部署
+
+如果你只是想最快跑起来，进入 `backend/` 后分两步执行。
+
+先安装依赖：
 
 ```bash
-cd bb-clone-py/backend
-python3 -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-建议先配置环境变量：
+再运行应用：
 
 ```bash
-export SECRET_KEY="replace-with-a-long-random-string"
-export ADMIN_PASSWORD="replace-with-a-strong-password"
-python3 app.py
+SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" python3 app.py
 ```
 
-默认运行在：
+如果你想放到后台运行：
+
+```bash
+nohup env SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" python3 app.py > app.log 2>&1 &
+```
+
+默认地址：
 
 - `http://localhost:5000`
 
-### 本地第一次使用
+第一次使用建议这样体验：
 
 1. 打开 `http://localhost:5000/`
-2. 如果要体验快速发帖，访问 `http://localhost:5000/quick`
+2. 访问 `http://localhost:5000/quick`
 3. 第一次登录时勾选 **记住这台设备**
-4. 以后直接打开 `/quick` 即可发帖
+4. 以后直接打开 `/quick` 即可快速发帖
 
 ## 安装成“发帖器”
 
@@ -118,10 +137,6 @@ python3 app.py
 - **Edge**：右上角 `...` → **应用** → **将此站点安装为应用**
 - **Chrome**：右上角 `...` → **安装应用**
 
-安装后：
-- 可以固定到开始菜单 / 任务栏
-- 打开默认进入 `/quick`
-
 ### Android
 
 使用 **Chrome** 打开：
@@ -132,8 +147,6 @@ python3 app.py
 
 - 右上角 `...` → **安装应用**
 - 如果没有该入口，就使用 **添加到主屏幕**
-
-安装后点击图标，会优先进入 `/quick`。
 
 ### 使用建议
 
@@ -169,16 +182,6 @@ python3 app.py
 | PUT | `/api/settings` | 更新站点设置，需要登录 |
 | PUT | `/api/settings/password` | 修改管理密码，需要登录 |
 
-## 环境变量
-
-- `SECRET_KEY`：Flask session key。生产环境必须配置。
-- `ADMIN_PASSWORD`：首次初始化管理密码；写入数据库后，后续可在后台修改。
-- `SITE_URL`：生成 RSS 绝对链接时优先使用的站点地址，例如 `https://example.com`。
-- `API_BASE`：可选。用于把首页里的 `/api/*` 请求前缀指向别的路径前缀。
-- `CORS_ORIGINS`：可选。逗号分隔的允许跨域来源列表，例如 `https://site-a.com,https://site-b.com`。
-- `SESSION_COOKIE_SECURE`：可选。设为 `true` / `1` / `yes` 时，仅通过 HTTPS 发送 session cookie。
-- `PORT`：可选。默认 `5000`。
-
 ## 安全说明
 
 这个项目默认面向 **个人使用 / 自部署** 场景。
@@ -193,19 +196,6 @@ python3 app.py
 - 建议生产环境启用 HTTPS
 - 不建议把这个项目直接当成多用户公共发帖系统使用
 
-## 部署建议
-
-最简单的部署方式是：
-
-- Flask 同源部署
-- 站点域名下同时提供公开首页和 `/quick`
-- 使用 SQLite 持久化数据
-
-如果你希望安装体验更稳定：
-- 保持域名固定
-- 保持 HTTPS 可用
-- 不要频繁更换 `SECRET_KEY`
-
 ## 适合谁
 
 如果你想要的是：
@@ -217,7 +207,7 @@ python3 app.py
 
 ## 开源说明
 
-如果你把这个项目继续 fork、修改或公开发布，建议保留上面的来源说明，并在你自己的 README 里明确写出哪些部分是你新增或改造的。
+如果你把这个项目继续 fork、修改或公开发布，请保留来源说明
 
 ## License
 
