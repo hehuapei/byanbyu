@@ -1,0 +1,6 @@
+.claude/
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/data/*.db
+backend/data/*.db-*

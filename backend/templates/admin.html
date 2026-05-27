@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ site_title }} · 管理</title>
+<style>
+:root{--fg:rgba(255,255,255,1);--card-bg:rgb(250,250,250);--text:rgba(54,54,54,1);--accent:rgba(255,0,0,0.7)}
+@media(prefers-color-scheme:dark){:root{--fg:rgba(0,0,0,1);--card-bg:rgba(20,20,20,1);--text:rgba(255,255,255,0.9);--accent:rgba(255,100,100,1)}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:17px;color:var(--text);background-color:var(--fg);-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.main{margin:auto;width:100%;max-width:620px;padding:0 12px}
+h1{font-size:1.5rem;padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:8px}
+.nav{display:flex;gap:16px;margin-bottom:16px;font-size:.85rem}
+.nav a{color:var(--accent)}
+.back-link{display:inline-block;margin-bottom:12px;font-size:.85rem;color:var(--accent)}
+.section{border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:12px;margin-bottom:16px}
+.section label{display:block;font-size:.8rem;font-weight:400;opacity:.5;margin-bottom:4px}
+.section textarea{width:100%;padding:8px;font-size:.9rem;font-family:inherit;border:1px solid rgba(128,128,128,.2);border-radius:4px;background:var(--card-bg);color:var(--text)}
+.section textarea:focus{outline:none;border-color:var(--accent)}
+.section textarea{min-height:60px;resize:vertical}
+.section .btn-row{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.section button{padding:6px 16px;border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-size:.85rem;transition:opacity .2s;color:#fff;background:var(--accent)}
+.section button:hover{opacity:.8}
+.batch-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding:8px 10px;border:1px solid rgba(128,128,128,.18);border-radius:4px;background:var(--card-bg)}
+.batch-bar .left{display:flex;align-items:center;gap:10px;min-width:0}
+.batch-bar .count{font-size:.8rem;opacity:.6}
+.batch-bar .toggle{display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer}
+.batch-bar .toggle input{margin:0}
+.batch-bar .actions{display:flex;justify-content:flex-end}
+.batch-bar .actions button{padding:6px 12px;border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-size:.82rem;color:#fff;background:var(--accent)}
+.batch-bar .actions button:disabled,.post-item .del:disabled{cursor:not-allowed;opacity:.35}
+.post-list{display:flex;flex-direction:column;gap:8px;padding-bottom:40px}
+.post-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid rgba(128,128,128,.15);border-radius:4px;font-size:.85rem;line-height:1.4}
+.post-item .pick{display:flex;align-items:center;padding-top:2px}
+.post-item .pick input{margin:0}
+.post-item .content{flex:1;min-width:0;word-break:break-word}
+.post-item .time{white-space:nowrap;color:var(--accent);opacity:.5;font-size:.75rem;margin-top:2px}
+.post-item .del{flex-shrink:0;padding:2px 8px;border:1px solid rgba(128,128,128,.3);border-radius:3px;cursor:pointer;font-size:.75rem;background:transparent;color:var(--text);opacity:.4;transition:opacity .2s}
+.post-item .del:hover:not(:disabled){opacity:1;border-color:var(--accent);color:var(--accent)}
+.msg{padding:6px 12px;margin-bottom:12px;border-radius:4px;font-size:.85rem;display:none}
+.msg.success{display:block;background:rgba(0,180,0,.1);color:green}
+.msg.error{display:block;background:rgba(180,0,0,.1);color:red}
+</style>
+</head>
+<body>
+<main class="main">
+  <h1>{{ site_title }} · 管理</h1>
+  <div class="nav">
+    <span class="back-link" style="opacity:.4;pointer-events:none">管理首页</span>
+    <a class="back-link" href="/admin/settings">站点设置</a>
+    <a class="back-link" href="/admin/password">修改密码</a>
+    <a class="back-link" href="/admin/logout">退出</a>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- 发帖 -->
+  <div class="section">
+    <label for="postText">写新帖</label>
+    <textarea id="postText" rows="4" placeholder="支持纯文本段落，空行分段"></textarea>
+    <div class="btn-row">
+      <button id="submitBtn" onclick="submitPost()">发布</button>
+    </div>
+  </div>
+
+  <!-- 帖子列表 -->
+  <div class="batch-bar">
+    <div class="left">
+      <label class="toggle"><input id="selectAllPosts" type="checkbox" onchange="toggleAllPosts()">全选</label>
+      <span id="selectedCount" class="count">已选 0 条</span>
+    </div>
+    <div class="actions">
+      <button id="deleteSelectedBtn" type="button" onclick="deleteSelectedPosts()" disabled>删除所选</button>
+    </div>
+  </div>
+  <div id="postList" class="post-list"></div>
+</main>
+
+<script>
+var msgEl = document.getElementById('msg');
+var postTextEl = document.getElementById('postText');
+var submitBtn = document.getElementById('submitBtn');
+var selectAllPostsEl = document.getElementById('selectAllPosts');
+var selectedCountEl = document.getElementById('selectedCount');
+var deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+var composeMode = new URLSearchParams(window.location.search).get('compose') === '1';
+var selectedPostIds = new Set();
+var posts = [];
+var isDeleting = false;
+
+function showMsg(text, type) {
+  msgEl.className = 'msg ' + type;
+  msgEl.textContent = text;
+  setTimeout(function() { msgEl.style.display = 'none'; }, 3000);
+}
+function handleResponse(r) {
+  if (r.status === 401) { window.location.href = '/admin/login'; return null; }
+  return r.json();
+}
+function escapeAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function updateBatchActions() {
+  var selectedCount = selectedPostIds.size;
+  var totalCount = posts.length;
+  selectedCountEl.textContent = '已选 ' + selectedCount + ' 条';
+  deleteSelectedBtn.disabled = !selectedCount || isDeleting;
+  deleteSelectedBtn.textContent = selectedCount ? '删除所选（' + selectedCount + '）' : '删除所选';
+  selectAllPostsEl.checked = !!totalCount && selectedCount === totalCount;
+  selectAllPostsEl.indeterminate = selectedCount > 0 && selectedCount < totalCount;
+  selectAllPostsEl.disabled = !totalCount || isDeleting;
+}
+function syncSelectedPostIds() {
+  var validIds = new Set(posts.map(function(item) { return item.id; }));
+  selectedPostIds.forEach(function(id) {
+    if (!validIds.has(id)) selectedPostIds.delete(id);
+  });
+}
+function togglePostSelection(id, checked) {
+  if (checked) selectedPostIds.add(id);
+  else selectedPostIds.delete(id);
+  updateBatchActions();
+}
+function toggleAllPosts() {
+  if (selectAllPostsEl.disabled) return;
+  if (selectAllPostsEl.checked) {
+    posts.forEach(function(item) { selectedPostIds.add(item.id); });
+  } else {
+    selectedPostIds.clear();
+  }
+  renderPosts();
+}
+function renderPosts() {
+  var list = document.getElementById('postList');
+  list.innerHTML = '';
+  posts.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'post-item';
+    div.innerHTML = '<label class="pick"><input type="checkbox" ' + (selectedPostIds.has(item.id) ? 'checked ' : '') + (isDeleting ? 'disabled ' : '') + 'onchange="togglePostSelection(\'' + escapeAttr(item.id) + '\', this.checked)"></label>'
+      + '<div class="content">' + item.htmlContent
+      + '<div class="time">' + item.timeFormatted + '</div></div>'
+      + '<button class="del" onclick="deletePost(\'' + escapeAttr(item.id) + '\')"' + (isDeleting ? ' disabled' : '') + '>×</button>';
+    list.appendChild(div);
+  });
+  updateBatchActions();
+}
+function loadPosts() {
+  fetch('/api/feed?offset=0&count=999')
+    .then(handleResponse)
+    .then(function(res) {
+      if (!res) return;
+      posts = res.data || [];
+      syncSelectedPostIds();
+      renderPosts();
+    });
+}
+function submitPost() {
+  var text = postTextEl.value.trim();
+  if (!text || submitBtn.disabled) return;
+  submitBtn.disabled = true;
+  fetch('/api/post', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text })
+  })
+  .then(handleResponse)
+  .then(function(res) {
+    if (!res) return;
+    if (res.success) {
+      postTextEl.value = '';
+      showMsg('发布成功', 'success');
+      loadPosts();
+      postTextEl.focus();
+    } else {
+      showMsg(res.error || '发布失败', 'error');
+    }
+  })
+  .finally(function() {
+    submitBtn.disabled = false;
+  });
+}
+function deletePost(id) {
+  if (isDeleting || !confirm('确定删除这条？')) return;
+  isDeleting = true;
+  updateBatchActions();
+  renderPosts();
+  fetch('/api/post/' + id, { method: 'DELETE' })
+    .then(handleResponse)
+    .then(function(res) {
+      if (!res) return;
+      if (res.success) {
+        selectedPostIds.delete(id);
+        showMsg('已删除', 'success');
+        loadPosts();
+      } else {
+        showMsg('删除失败', 'error');
+      }
+    })
+    .finally(function() {
+      isDeleting = false;
+      updateBatchActions();
+      renderPosts();
+    });
+}
+function deleteSelectedPosts() {
+  var ids = Array.from(selectedPostIds);
+  if (isDeleting || !ids.length) return;
+  if (!confirm('确定删除选中的 ' + ids.length + ' 条内容？')) return;
+  isDeleting = true;
+  updateBatchActions();
+  renderPosts();
+  fetch('/api/posts/batch-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: ids })
+  })
+    .then(handleResponse)
+    .then(function(res) {
+      if (!res) return;
+      if (res.success) {
+        selectedPostIds.clear();
+        showMsg('已删除 ' + (res.deletedCount || 0) + ' 条', 'success');
+        loadPosts();
+      } else {
+        showMsg(res.error || '删除失败', 'error');
+      }
+    })
+    .finally(function() {
+      isDeleting = false;
+      updateBatchActions();
+      renderPosts();
+    });
+}
+
+postTextEl.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    submitPost();
+  }
+});
+
+updateBatchActions();
+loadPosts();
+if (composeMode) {
+  setTimeout(function() {
+    postTextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    postTextEl.focus();
+  }, 50);
+}
+</script>
+</body>
+</html>
