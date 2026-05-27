@@ -59,8 +59,8 @@ bb-clone-py/
 │   ├── static/
 │   │   ├── manifest.webmanifest
 │   │   └── icons/
-│   │       ├── icon-192.png
-│   │       └── icon-512.png
+│   │       ├── favicon-192.png
+│   │       └── favicon-512.png
 │   ├── requirements.txt
 │   └── templates/
 │       ├── index.html
