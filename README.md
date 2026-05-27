@@ -76,8 +76,8 @@ bb-clone-py/
 
 最常用的只有这几个：
 
-- `SECRET_KEY`：Flask session key。生产环境必须配置。
-- `ADMIN_PASSWORD`：首次初始化管理密码；写入数据库后，后续可在后台修改。
+- `SECRET_KEY`：Flask session key。生产环境必须配置，而且后续每次重启都要保持一致。
+- `ADMIN_PASSWORD`：首次初始化管理密码。新库第一次启动时需要；写入数据库后，后续可在后台修改，通常不需要每次重启都传。
 - `PORT`：可选。默认 `5000`。
 
 其他可选项：
@@ -89,24 +89,38 @@ bb-clone-py/
 
 ## 运行 / 部署
 
-如果你只是想最快跑起来，进入 `backend/` 后分两步执行。
+进入 `backend/` 后，推荐用虚拟环境运行。
 
-先安装依赖：
+先创建并进入虚拟环境（首次执行一次）：
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate
 ```
 
-再运行应用：
+再安装依赖：
 
 ```bash
-SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" python3 app.py
+python -m pip install -r requirements.txt
+```
+
+最后运行应用：
+
+> `SECRET_KEY` 后续每次启动都应该保持不变；`ADMIN_PASSWORD` 主要用于第一次初始化数据库。
+
+```bash
+SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" python app.py
 ```
 
 如果你想放到后台运行：
 
 ```bash
-nohup env SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" python3 app.py > app.log 2>&1 &
+nohup env SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" .venv/bin/python app.py > app.log 2>&1 &
+```
+
+如果服务器提示 `No module named venv` 或虚拟环境创建失败，先安装：
+
+```bash
+apt install -y python3-venv python3-pip
 ```
 
 默认地址：
