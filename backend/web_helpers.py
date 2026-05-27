@@ -29,7 +29,8 @@ def text_to_html(text):
                 code.append(lines[i])
                 i += 1
             tag = f' class="language-{lang}"' if lang else ''
-            html.append(f'<pre><code{tag}>{"\\n".join(code)}</code></pre>')
+            code_html = '\n'.join(code)
+            html.append(f'<pre><code{tag}>{code_html}</code></pre>')
             i += 1
             continue
 

@@ -89,7 +89,7 @@ bb-clone-py/
 
 ## 运行 / 部署
 
-进入 `backend/` 后，推荐用虚拟环境运行。
+下面这些命令都需要在 `backend/` 目录里执行，推荐用虚拟环境运行。
 
 先创建并进入虚拟环境（首次执行一次）：
 
@@ -117,7 +117,7 @@ SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-st
 nohup env SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace-with-a-strong-password" .venv/bin/python app.py > app.log 2>&1 &
 ```
 
-如果服务器提示 `No module named venv` 或虚拟环境创建失败，先安装：
+如果服务器提示 `No module named venv`、`No module named pip`，或者虚拟环境创建失败，先安装：
 
 ```bash
 apt install -y python3-venv python3-pip
