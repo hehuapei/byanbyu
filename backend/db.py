@@ -12,21 +12,6 @@ DEFAULT_SETTINGS = {
     'site_desc': '这里没有点赞评论、阅读量以及随之而来的社交压力，我也不关心你多久会点开与忘记这个站点，因为它的全部意义就在于迎合我自己。',
 }
 
-SEED_POSTS = [
-    '这是我的第一条碎碎念 🦞\n\n这里没有点赞评论、阅读量以及随之而来的社交压力。\n它的全部意义就在于迎合我自己。',
-    '也许未来 code plan 可以用运营商套餐来类比，每台电脑启动后自带 server ，前端软件通过标准化接口访问',
-    '自媒体就是帮读者提前向 AI 提问和排版的人',
-    '"让 AI 自动化工作"能包含多少 startup 的叙事？这句话的天花板是多少？',
-    '希望做超出人类意图，导向更好结果的产品',
-    '从资产角度看，每个抛出去的项目本身都是负债。至少要支付注意力。',
-    '过度抽象是虚无的开始',
-    '这是个奖励疯子的时代',
-    '小红书上那么多垂类经验分享帖是不是都能转 skill ？以后大家别发帖了，直接发 skill',
-    '引擎、改善贫穷还有最近在做的自迭代 agent 都指向了一个足够基础的事实：利用外部能量达到自持的临界值是唯一重要的事',
-    'Claude 降智有感：未来全球经济会因为模型公司的一个小动作波动几个百分点',
-]
-
-
 @contextmanager
 def get_db():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -86,28 +71,6 @@ def init_db(admin_password=None, html_renderer=None):
                 "INSERT INTO settings (key, value) VALUES (?, ?)",
                 ('admin_password', admin_password)
             )
-
-        row = db.execute("SELECT COUNT(*) FROM posts").fetchone()
-        if row[0] == 0 and html_renderer is not None:
-            _seed(db, html_renderer)
-
-
-def _seed(db, html_renderer):
-    now = datetime.now()
-    rows = []
-    for i, text in enumerate(SEED_POSTS):
-        dt = datetime.fromtimestamp(now.timestamp() - (len(SEED_POSTS) - i) * 86400 * 3)
-        rows.append((
-            str(uuid.uuid4()),
-            text,
-            html_renderer(text),
-            dt.isoformat(),
-        ))
-    db.executemany(
-        "INSERT INTO posts (id, text, htmlContent, created_at) VALUES (?, ?, ?, ?)",
-        rows
-    )
-
 
 def get_settings():
     with get_db() as db:
