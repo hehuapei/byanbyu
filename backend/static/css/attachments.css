@@ -155,6 +155,7 @@
   align-items: center;
   justify-content: center;
   user-select: none;
+  touch-action: none;
 }
 .bb-lightbox.open { display: flex; }
 .bb-lightbox-stage {
@@ -183,6 +184,9 @@
   object-fit: contain;
   display: block;
   border-radius: 4px;
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
 }
 .bb-lightbox-content .bb-lp { position: relative; line-height: 0; }
 .bb-lightbox-content .bb-lp video {
