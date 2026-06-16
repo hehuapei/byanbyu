@@ -40,10 +40,15 @@
     var grid = document.createElement('div');
     grid.className = 'bb-attachments';
     grid.setAttribute('data-count', String(attachments.length));
-    attachments.forEach(function (att) {
+    attachments.forEach(function (att, idx) {
       var node = att.kind === 'live_photo' ? renderLivePhoto(att, useFull) : renderImage(att, useFull);
-      // Stop click on attachment from bubbling to enclosing <a>
-      node.addEventListener('click', function (e) { e.preventDefault(); });
+      node.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.bbLightbox && typeof window.bbLightbox.open === 'function') {
+          window.bbLightbox.open(attachments, idx);
+        }
+      });
       grid.appendChild(node);
     });
     parent.appendChild(grid);

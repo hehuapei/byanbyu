@@ -1,0 +1,102 @@
+// Lightbox for viewing attachment full-size images and Live Photos.
+// Open via: window.bbLightbox.open(attachments, startIndex)
+
+(function () {
+  var overlay = null;
+  var state = { items: [], index: 0 };
+
+  function ensureOverlay() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.className = 'bb-lightbox';
+    overlay.innerHTML =
+      '<div class="bb-lightbox-counter"></div>' +
+      '<button type="button" class="bb-lightbox-btn bb-lightbox-close" aria-label="关闭">×</button>' +
+      '<button type="button" class="bb-lightbox-btn bb-lightbox-prev" aria-label="上一张">‹</button>' +
+      '<div class="bb-lightbox-stage"><div class="bb-lightbox-content"></div></div>' +
+      '<button type="button" class="bb-lightbox-btn bb-lightbox-next" aria-label="下一张">›</button>';
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.classList.contains('bb-lightbox-stage')) close();
+    });
+    overlay.querySelector('.bb-lightbox-close').addEventListener('click', function (e) {
+      e.stopPropagation();
+      close();
+    });
+    overlay.querySelector('.bb-lightbox-prev').addEventListener('click', function (e) {
+      e.stopPropagation();
+      step(-1);
+    });
+    overlay.querySelector('.bb-lightbox-next').addEventListener('click', function (e) {
+      e.stopPropagation();
+      step(1);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowRight') step(1);
+    });
+  }
+
+  function render() {
+    var content = overlay.querySelector('.bb-lightbox-content');
+    content.innerHTML = '';
+    var item = state.items[state.index];
+    if (!item) return;
+    if (item.kind === 'live_photo') {
+      var lp = document.createElement('div');
+      lp.className = 'bb-lp';
+      lp.setAttribute('data-still', item.urls.image);
+      lp.setAttribute('data-video', item.urls.video || '');
+      var img = document.createElement('img');
+      img.src = item.urls.image;
+      lp.appendChild(img);
+      var badge = document.createElement('span');
+      badge.className = 'bb-lp-badge';
+      badge.textContent = 'LIVE';
+      lp.appendChild(badge);
+      content.appendChild(lp);
+      if (window.bbLivePhoto && typeof window.bbLivePhoto.scan === 'function') {
+        window.bbLivePhoto.scan(content);
+      }
+    } else {
+      var img2 = document.createElement('img');
+      img2.src = item.urls.image;
+      content.appendChild(img2);
+    }
+    content.addEventListener('click', function (e) { e.stopPropagation(); }, { once: true });
+
+    var multi = state.items.length > 1;
+    overlay.querySelector('.bb-lightbox-counter').textContent = multi ? (state.index + 1) + ' / ' + state.items.length : '';
+    overlay.querySelector('.bb-lightbox-prev').style.display = multi ? '' : 'none';
+    overlay.querySelector('.bb-lightbox-next').style.display = multi ? '' : 'none';
+  }
+
+  function open(items, index) {
+    if (!items || !items.length) return;
+    ensureOverlay();
+    state.items = items;
+    state.index = Math.max(0, Math.min(index || 0, items.length - 1));
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    render();
+  }
+
+  function close() {
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    overlay.querySelector('.bb-lightbox-content').innerHTML = '';
+  }
+
+  function step(delta) {
+    if (!state.items.length) return;
+    var n = state.items.length;
+    state.index = (state.index + delta + n) % n;
+    render();
+  }
+
+  window.bbLightbox = { open: open, close: close };
+})();
