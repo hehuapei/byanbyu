@@ -17,9 +17,6 @@
       '<button type="button" class="bb-lightbox-btn bb-lightbox-next" aria-label="下一张">›</button>';
     document.body.appendChild(overlay);
 
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay || e.target.classList.contains('bb-lightbox-stage')) close();
-    });
     overlay.querySelector('.bb-lightbox-close').addEventListener('click', function (e) {
       e.stopPropagation();
       close();
@@ -38,6 +35,38 @@
       else if (e.key === 'ArrowLeft') step(-1);
       else if (e.key === 'ArrowRight') step(1);
     });
+
+    // Swipe gestures (touch + mouse drag)
+    var swipeStartX = null;
+    var swipeStartY = null;
+    var swipeStartTime = 0;
+    var suppressNextClick = false;
+    overlay.addEventListener('click', function (e) {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      if (e.target === overlay || e.target.classList.contains('bb-lightbox-stage')) close();
+    });
+    overlay.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.bb-lightbox-btn')) return;
+      swipeStartX = e.clientX;
+      swipeStartY = e.clientY;
+      swipeStartTime = Date.now();
+    });
+    overlay.addEventListener('pointerup', function (e) {
+      if (swipeStartX == null) return;
+      var dx = e.clientX - swipeStartX;
+      var dy = e.clientY - swipeStartY;
+      var dt = Date.now() - swipeStartTime;
+      swipeStartX = null;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) suppressNextClick = true;
+      if (state.items.length <= 1) return;
+      if (dt < 600 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        step(dx < 0 ? 1 : -1);
+      }
+    });
+    overlay.addEventListener('pointercancel', function () { swipeStartX = null; });
   }
 
   function render() {

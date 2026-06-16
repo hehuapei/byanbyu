@@ -66,7 +66,6 @@ h1{font-size:1.5rem;padding-top:calc(24px + env(safe-area-inset-top));padding-bo
     <div id="attachTiles" class="bb-att-preview-row" hidden></div>
     <div class="bb-att-toolbar">
       <button type="button" class="bb-att-button" id="addAttachBtn">+ 图片 / Live Photo</button>
-      <button type="button" class="bb-att-button is-primary" id="pairAttachBtn" disabled>配对为 Live Photo</button>
       <input type="file" id="attachInput" multiple accept="image/*,video/quicktime,video/mp4,.mov,.heic,.heif" hidden>
     </div>
     <div class="btn-row">
@@ -101,7 +100,6 @@ var deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
 var attachTilesEl = document.getElementById('attachTiles');
 var attachInput = document.getElementById('attachInput');
 var addAttachBtn = document.getElementById('addAttachBtn');
-var pairAttachBtn = document.getElementById('pairAttachBtn');
 var composeMode = new URLSearchParams(window.location.search).get('compose') === '1';
 var selectedPostIds = new Set();
 var posts = [];
@@ -116,7 +114,6 @@ function showMsg(text, type) {
 var compose = window.bbCompose.create({
   fileInput: attachInput,
   tilesEl: attachTilesEl,
-  pairBtn: pairAttachBtn,
   showError: function (m) { showMsg(m, 'error'); },
   onChange: function () { attachTilesEl.hidden = compose.count() === 0; },
 });

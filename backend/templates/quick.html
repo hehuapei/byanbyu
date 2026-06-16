@@ -117,11 +117,10 @@ textarea::placeholder{color:var(--muted)}
       <div id="attachTiles" class="bb-att-preview-row" hidden></div>
       <div class="bb-att-toolbar">
         <button type="button" class="bb-att-button" id="addAttachBtn">+ 图片 / Live Photo</button>
-        <button type="button" class="bb-att-button is-primary" id="pairAttachBtn" disabled>配对为 Live Photo</button>
         <input type="file" id="attachInput" multiple accept="image/*,video/quicktime,video/mp4,.mov,.heic,.heif" hidden>
       </div>
       <div class="helper">
-        <div class="helper-tip">支持换行分段，桌面端可用 Ctrl / Cmd + Enter 发送。Live Photo：选 1 张图 + 1 个 .mov，再点配对。</div>
+        <div class="helper-tip">支持换行分段，桌面端可用 Ctrl / Cmd + Enter 发送。Live Photo：把同名 .HEIC + .MOV 一起选上传即可，会自动合并。</div>
         <div id="helperMeta" class="helper-meta">准备发送</div>
       </div>
     </section>
@@ -142,7 +141,6 @@ var helperMetaEl = document.getElementById('helperMeta');
 var attachTilesEl = document.getElementById('attachTiles');
 var attachInput = document.getElementById('attachInput');
 var addAttachBtn = document.getElementById('addAttachBtn');
-var pairAttachBtn = document.getElementById('pairAttachBtn');
 var draftKey = 'quick-post-draft';
 var toastTimer = null;
 var draftTimer = null;
@@ -162,7 +160,6 @@ function showMsg(text, type) {
 var compose = window.bbCompose.create({
   fileInput: attachInput,
   tilesEl: attachTilesEl,
-  pairBtn: pairAttachBtn,
   showError: function (m) { showMsg(m, 'error'); },
   onChange: function () {
     attachTilesEl.hidden = compose.count() === 0;
