@@ -136,8 +136,6 @@ function fetchMore() {
         section.className = 'bb-card';
         var a = document.createElement('a');
         a.href = '/post/' + item.id;
-        a.target = '_blank';
-        a.rel = 'noreferrer';
         a.innerHTML = '<div class="bb-content">' + item.htmlContent + '</div>'
                     + '<time class="bb-time">' + item.timeFormatted + '</time>';
         section.appendChild(a);
