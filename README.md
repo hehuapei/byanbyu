@@ -30,6 +30,7 @@
 
 - 公开首页 feed
 - 单帖详情页
+- 帖子支持图片和 Live Photo（按住 / 悬停播放）
 - 极简快速发帖页 `/quick`
 - 移动端优化的快速发布体验
 - 可信设备免登录（第一次登录后可长期直达 `/quick`）
@@ -53,11 +54,20 @@ bb-clone-py/
 ├── backend/
 │   ├── app.py
 │   ├── db.py
+│   ├── media.py
+│   ├── storage.py
 │   ├── web_helpers.py
 │   ├── data/
-│   │   └── posts.db
+│   │   ├── posts.db
+│   │   └── uploads/
 │   ├── static/
 │   │   ├── manifest.webmanifest
+│   │   ├── css/
+│   │   │   └── attachments.css
+│   │   ├── js/
+│   │   │   ├── compose-attachments.js
+│   │   │   ├── livephoto.js
+│   │   │   └── render-attachments.js
 │   │   └── icons/
 │   │       ├── favicon-192.png
 │   │       └── favicon-512.png
@@ -122,6 +132,12 @@ nohup env SECRET_KEY="replace-with-a-long-random-string" ADMIN_PASSWORD="replace
 
 ```bash
 apt install -y python3-venv python3-pip
+```
+
+`pillow-heif`（HEIC 转 JPEG 用）大多数 Linux 发行版有官方 wheel；如果你的环境没有 wheel，需要先装系统依赖：
+
+```bash
+apt install -y libheif-dev
 ```
 
 默认地址：

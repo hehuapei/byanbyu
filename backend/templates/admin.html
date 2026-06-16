@@ -6,6 +6,7 @@
 <title>{{ site_title }} · 管理</title>
 <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/favicon-192.png">
 <link rel="apple-touch-icon" href="/static/icons/favicon-192.png">
+<link rel="stylesheet" href="/static/css/attachments.css">
 <style>
 :root{--fg:rgba(255,255,255,1);--card-bg:rgb(250,250,250);--text:rgba(54,54,54,1);--accent:rgba(255,0,0,0.7)}
 @media(prefers-color-scheme:dark){:root{--fg:rgba(0,0,0,1);--card-bg:rgba(20,20,20,1);--text:rgba(255,255,255,0.9);--accent:rgba(255,100,100,1)}}
@@ -62,6 +63,12 @@ h1{font-size:1.5rem;padding-top:calc(24px + env(safe-area-inset-top));padding-bo
   <div class="section">
     <label for="postText">写新帖</label>
     <textarea id="postText" rows="4" placeholder="支持纯文本段落，空行分段"></textarea>
+    <div id="attachTiles" class="bb-att-preview-row" hidden></div>
+    <div class="bb-att-toolbar">
+      <button type="button" class="bb-att-button" id="addAttachBtn">+ 图片 / Live Photo</button>
+      <button type="button" class="bb-att-button is-primary" id="pairAttachBtn" disabled>配对为 Live Photo</button>
+      <input type="file" id="attachInput" multiple accept="image/*,video/quicktime,video/mp4,.mov,.heic,.heif" hidden>
+    </div>
     <div class="btn-row">
       <button id="submitBtn" onclick="submitPost()">发布</button>
     </div>
@@ -80,6 +87,9 @@ h1{font-size:1.5rem;padding-top:calc(24px + env(safe-area-inset-top));padding-bo
   <div id="postList" class="post-list"></div>
 </main>
 
+<script src="/static/js/livephoto.js"></script>
+<script src="/static/js/render-attachments.js"></script>
+<script src="/static/js/compose-attachments.js"></script>
 <script>
 var msgEl = document.getElementById('msg');
 var postTextEl = document.getElementById('postText');
@@ -87,6 +97,10 @@ var submitBtn = document.getElementById('submitBtn');
 var selectAllPostsEl = document.getElementById('selectAllPosts');
 var selectedCountEl = document.getElementById('selectedCount');
 var deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+var attachTilesEl = document.getElementById('attachTiles');
+var attachInput = document.getElementById('attachInput');
+var addAttachBtn = document.getElementById('addAttachBtn');
+var pairAttachBtn = document.getElementById('pairAttachBtn');
 var composeMode = new URLSearchParams(window.location.search).get('compose') === '1';
 var selectedPostIds = new Set();
 var posts = [];
@@ -97,6 +111,19 @@ function showMsg(text, type) {
   msgEl.textContent = text;
   setTimeout(function() { msgEl.style.display = 'none'; }, 3000);
 }
+
+var compose = window.bbCompose.create({
+  fileInput: attachInput,
+  tilesEl: attachTilesEl,
+  pairBtn: pairAttachBtn,
+  showError: function (m) { showMsg(m, 'error'); },
+  onChange: function () { attachTilesEl.hidden = compose.count() === 0; },
+});
+
+addAttachBtn.addEventListener('click', function (e) {
+  e.preventDefault();
+  attachInput.click();
+});
 function handleResponse(r) {
   if (r.status === 401) { window.location.href = '/admin/login'; return null; }
   return r.json();
@@ -144,6 +171,10 @@ function renderPosts() {
       + '<div class="content">' + item.htmlContent
       + '<div class="time">' + item.timeFormatted + '</div></div>'
       + '<button class="del" onclick="deletePost(\'' + escapeAttr(item.id) + '\')"' + (isDeleting ? ' disabled' : '') + '>×</button>';
+    if (item.attachments && item.attachments.length) {
+      var contentBox = div.querySelector('.content');
+      window.bbAttachments.render(contentBox, item.attachments);
+    }
     list.appendChild(div);
   });
   updateBatchActions();
@@ -160,18 +191,23 @@ function loadPosts() {
 }
 function submitPost() {
   var text = postTextEl.value.trim();
-  if (!text || submitBtn.disabled) return;
+  var hasAttachments = compose.hasItems();
+  if ((!text && !hasAttachments) || submitBtn.disabled) return;
   submitBtn.disabled = true;
-  fetch('/api/post', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: text })
-  })
+
+  var fd = compose.buildFormData({ text: text });
+  if (!fd) {
+    submitBtn.disabled = false;
+    return;
+  }
+
+  fetch('/api/post', { method: 'POST', body: fd })
   .then(handleResponse)
   .then(function(res) {
     if (!res) return;
     if (res.success) {
       postTextEl.value = '';
+      compose.clear();
       showMsg('发布成功', 'success');
       loadPosts();
       postTextEl.focus();

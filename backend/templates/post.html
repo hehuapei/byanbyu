@@ -7,6 +7,7 @@
 <meta name="description" content="碎碎念">
 <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/favicon-192.png">
 <link rel="apple-touch-icon" href="/static/icons/favicon-192.png">
+<link rel="stylesheet" href="/static/css/attachments.css">
 <style>
 :root {
   --fg: rgba(255, 255, 255, 1);
@@ -57,9 +58,20 @@ a{color:inherit;text-decoration:none}
   </header>
   <div class="detail">
     <div class="bb-content">{{ post.htmlContent | safe }}</div>
+    <div id="attachmentsRoot"></div>
     <time class="bb-time">{{ post.timeFormatted }}</time>
   </div>
   <div class="backtohome"><a href="/">← 回去</a></div>
 </main>
+<script src="/static/js/livephoto.js"></script>
+<script src="/static/js/render-attachments.js"></script>
+<script>
+(function () {
+  var attachments = {{ post.attachments | tojson }};
+  if (attachments && attachments.length) {
+    window.bbAttachments.render(document.getElementById('attachmentsRoot'), attachments, { useFullSize: true });
+  }
+})();
+</script>
 </body>
 </html>

@@ -1,0 +1,145 @@
+/* Attachment grid layout, used by feed/post/admin pages. Colors come from
+   each page's own CSS variable palette. */
+
+.bb-attachments {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  width: 100%;
+}
+.bb-attachments[data-count="1"] { grid-template-columns: 1fr; }
+.bb-attachments[data-count="2"] { grid-template-columns: 1fr 1fr; }
+.bb-attachments[data-count="3"],
+.bb-attachments[data-count="5"],
+.bb-attachments[data-count="6"],
+.bb-attachments[data-count="7"],
+.bb-attachments[data-count="8"],
+.bb-attachments[data-count="9"] {
+  grid-template-columns: repeat(3, 1fr);
+}
+.bb-attachments[data-count="4"] { grid-template-columns: 1fr 1fr; }
+
+.bb-att {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.1);
+}
+.bb-attachments[data-count="1"] .bb-att {
+  aspect-ratio: auto;
+  max-height: min(70vh, 560px);
+}
+.bb-att img,
+.bb-att video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bb-attachments[data-count="1"] .bb-att img,
+.bb-attachments[data-count="1"] .bb-att video {
+  object-fit: contain;
+  background: #000;
+}
+
+.bb-lp { position: relative; }
+.bb-lp video {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.bb-lp.playing video { opacity: 1; }
+.bb-lp.playing img { opacity: 0; transition: opacity 0.18s ease; }
+.bb-lp-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Compose-side preview tile */
+.bb-att-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.bb-att-tile {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.15);
+  flex-shrink: 0;
+}
+.bb-att-tile img,
+.bb-att-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bb-att-tile.is-paired { outline: 2px solid var(--accent, #ff4d4f); outline-offset: -2px; }
+.bb-att-tile .tile-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.bb-att-tile .tile-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.bb-att-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 0.82rem;
+}
+.bb-att-button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.bb-att-button:disabled { opacity: 0.4; cursor: not-allowed; }
+.bb-att-button.is-primary {
+  border-color: var(--accent, #ff4d4f);
+  color: var(--accent, #ff4d4f);
+}
