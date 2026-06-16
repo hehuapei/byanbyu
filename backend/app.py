@@ -292,6 +292,7 @@ def post_detail(post_id):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', '').lower() in {'1', 'true', 'yes'}
     print(f'🦞 b言b语 running at http://localhost:{port}')
     print(f'   DB: {DB_PATH}')
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug)

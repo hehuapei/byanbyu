@@ -86,6 +86,7 @@ bb-clone-py/
 - `API_BASE`：可选。用于把首页里的 `/api/*` 请求前缀指向别的路径前缀。
 - `CORS_ORIGINS`：可选。逗号分隔的允许跨域来源列表，例如 `https://site-a.com,https://site-b.com`。
 - `SESSION_COOKIE_SECURE`：可选。设为 `true` / `1` / `yes` 时，仅通过 HTTPS 发送 session cookie。
+- `FLASK_DEBUG`：可选。设为 `true` / `1` / `yes` 时启用 Flask 调试器，仅本地开发使用，生产环境请保持关闭。
 
 ## 运行 / 部署
 
