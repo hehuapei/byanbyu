@@ -1,2 +1,5 @@
 flask>=3.0
 flask-cors>=4.0
+pillow>=10.0
+pillow-heif>=0.16
+filetype>=1.2
