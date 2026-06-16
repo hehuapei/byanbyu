@@ -1,6 +1,7 @@
 import os
 import secrets
 from datetime import datetime, timedelta
+from xml.sax.saxutils import escape as xml_escape
 
 from flask import Flask, abort, jsonify, make_response, redirect, render_template, request, session, url_for
 from flask_cors import CORS
@@ -205,11 +206,11 @@ def rss_feed():
     rss = f'''<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>{settings.get('site_title', 'b言b语')}</title>
-    <link>{site_url}</link>
-    <description>{settings.get('site_desc', '碎碎念')}</description>
+    <title>{xml_escape(settings.get('site_title', 'b言b语'))}</title>
+    <link>{xml_escape(site_url)}</link>
+    <description>{xml_escape(settings.get('site_desc', '碎碎念'))}</description>
     <language>zh-CN</language>
-    <atom:link href="{external_url('/rss.xml', SITE_URL)}" rel="self" type="application/rss+xml"/>
+    <atom:link href="{xml_escape(external_url('/rss.xml', SITE_URL))}" rel="self" type="application/rss+xml"/>
 {chr(10).join(items)}
   </channel>
 </rss>'''

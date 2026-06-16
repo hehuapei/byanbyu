@@ -8,14 +8,15 @@ from db import get_settings, get_trusted_device, touch_trusted_device
 
 
 def text_to_html(text):
-    escaped = (text
-        .replace('&', '&amp;')
-        .replace('<', '&lt;')
-        .replace('>', '&gt;')
-        .replace('"', '&quot;'))
+    def escape(s):
+        return (s
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;'))
 
     html = []
-    lines = escaped.split('\n')
+    lines = text.split('\n')
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -28,14 +29,14 @@ def text_to_html(text):
             while i < len(lines) and not lines[i].strip().startswith('```'):
                 code.append(lines[i])
                 i += 1
-            tag = f' class="language-{lang}"' if lang else ''
-            code_html = '\n'.join(code)
+            tag = f' class="language-{escape(lang)}"' if lang else ''
+            code_html = escape('\n'.join(code))
             html.append(f'<pre><code{tag}>{code_html}</code></pre>')
             i += 1
             continue
 
         if trimmed.startswith('> '):
-            html.append(f'<blockquote><p>{trimmed[2:]}</p></blockquote>')
+            html.append(f'<blockquote><p>{escape(trimmed[2:])}</p></blockquote>')
             i += 1
             continue
 
@@ -43,7 +44,7 @@ def text_to_html(text):
             i += 1
             continue
 
-        html.append(f'<p>{line}</p>')
+        html.append(f'<p>{escape(line)}</p>')
         i += 1
 
     return '\n'.join(html)

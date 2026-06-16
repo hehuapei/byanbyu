@@ -3,6 +3,7 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
+from xml.sax.saxutils import escape as xml_escape
 
 DB_DIR = os.path.join(os.path.dirname(__file__), 'data')
 DB_PATH = os.path.join(DB_DIR, 'posts.db')
@@ -167,11 +168,12 @@ def list_recent_posts(limit=10):
 
 def render_rss_item(row, post_url):
     pub = datetime.fromisoformat(row['created_at']).strftime('%a, %d %b %Y %H:%M:%S GMT')
-    title = row['text'].replace('<', '&lt;').replace('>', '&gt;')[:100]
+    title = xml_escape(row['text'][:100])
+    link = xml_escape(post_url)
     return f'''    <item>
       <title>{title}</title>
-      <link>{post_url}</link>
-      <guid>{post_url}</guid>
+      <link>{link}</link>
+      <guid>{link}</guid>
       <description><![CDATA[{row['htmlContent']}]]></description>
       <pubDate>{pub}</pubDate>
     </item>'''
