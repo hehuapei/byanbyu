@@ -14,7 +14,7 @@ from db import (
     delete_post,
     delete_posts,
     get_post,
-    get_settings,
+    get_public_settings,
     init_db,
     list_posts,
     list_recent_posts,
@@ -107,7 +107,7 @@ def admin_login():
     return render_template(
         'login.html',
         next_path=safe_redirect_target(request.args.get('next')),
-        **get_settings(),
+        **get_public_settings(),
     )
 
 
@@ -197,7 +197,7 @@ def rss_feed():
     rows = list_recent_posts()
 
     site_url = get_site_base_url(SITE_URL)
-    settings = get_settings()
+    settings = get_public_settings()
     items = [
         render_rss_item(r, external_url(f"/post/{r['id']}", SITE_URL))
         for r in rows
@@ -219,7 +219,7 @@ def rss_feed():
 
 @app.route('/api/settings')
 def api_get_settings():
-    return jsonify(get_settings())
+    return jsonify(get_public_settings())
 
 
 @app.route('/api/settings/password', methods=['PUT'])
@@ -253,31 +253,31 @@ def api_update_settings():
 
 @app.route('/')
 def serve_index():
-    return render_template('index.html', api_base=api_base_path(API_BASE), **get_settings())
+    return render_template('index.html', api_base=api_base_path(API_BASE), **get_public_settings())
 
 
 @app.route('/quick')
 @quick_auth_required(app.secret_key, cookie_name=TRUST_COOKIE_NAME)
 def quick_page():
-    return render_template('quick.html', **get_settings())
+    return render_template('quick.html', **get_public_settings())
 
 
 @app.route('/admin')
 @login_required
 def admin_page():
-    return render_template('admin.html', **get_settings())
+    return render_template('admin.html', **get_public_settings())
 
 
 @app.route('/admin/settings')
 @login_required
 def admin_settings():
-    return render_template('admin_settings.html', **get_settings())
+    return render_template('admin_settings.html', **get_public_settings())
 
 
 @app.route('/admin/password')
 @login_required
 def admin_password():
-    return render_template('admin_password.html', **get_settings())
+    return render_template('admin_password.html', **get_public_settings())
 
 
 @app.route('/post/<post_id>')
@@ -285,7 +285,7 @@ def post_detail(post_id):
     row = get_post(post_id)
     if not row:
         abort(404)
-    return render_template('post.html', post=serialize_post(row), **get_settings())
+    return render_template('post.html', post=serialize_post(row), **get_public_settings())
 
 
 # ── Main ────────────────────────────────────────────────────

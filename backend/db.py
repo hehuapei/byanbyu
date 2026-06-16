@@ -13,6 +13,8 @@ DEFAULT_SETTINGS = {
     'site_desc': '这里没有点赞评论、阅读量以及随之而来的社交压力，我也不关心你多久会点开与忘记这个站点，因为它的全部意义就在于迎合我自己。',
 }
 
+SENSITIVE_SETTING_KEYS = frozenset({'admin_password'})
+
 @contextmanager
 def get_db():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -77,6 +79,10 @@ def get_settings():
     with get_db() as db:
         rows = db.execute("SELECT key, value FROM settings").fetchall()
     return {r['key']: r['value'] for r in rows}
+
+
+def get_public_settings():
+    return {k: v for k, v in get_settings().items() if k not in SENSITIVE_SETTING_KEYS}
 
 
 def set_setting(key, value):
