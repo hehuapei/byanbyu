@@ -21,6 +21,8 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         yield conn
         conn.commit()
@@ -57,6 +59,24 @@ def init_db(admin_password=None, html_renderer=None):
                 ua_hash      TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_trusted_devices_token ON trusted_devices(token_hash);
+
+            CREATE TABLE IF NOT EXISTS attachments (
+                id          TEXT PRIMARY KEY,
+                post_id     TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                image_path  TEXT NOT NULL,
+                thumb_path  TEXT NOT NULL,
+                video_path  TEXT,
+                mime_image  TEXT NOT NULL,
+                mime_video  TEXT,
+                width       INTEGER NOT NULL,
+                height      INTEGER NOT NULL,
+                bytes       INTEGER NOT NULL,
+                position    INTEGER NOT NULL,
+                created_at  TEXT NOT NULL,
+                FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_attachments_post ON attachments(post_id, position);
         ''')
 
         for k, v in DEFAULT_SETTINGS.items():
@@ -93,13 +113,14 @@ def set_setting(key, value):
         )
 
 
-def serialize_post(row, include_text=True):
+def serialize_post(row, include_text=True, attachments=None):
     dt = datetime.fromisoformat(row['created_at'])
     post = {
         'id': row['id'],
         'htmlContent': row['htmlContent'],
         'created_at': row['created_at'],
         'timeFormatted': dt.strftime('%Y-%m-%d %H:%M:%S'),
+        'attachments': attachments or [],
     }
     if include_text:
         post['text'] = row['text']
@@ -132,36 +153,68 @@ def get_post(post_id):
         return db.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
 
 
-def create_post(text, html_renderer):
+def create_post(text, html_renderer, attachments=None):
     now = datetime.now()
-    post = {
-        'id': str(uuid.uuid4()),
-        'text': text,
-        'htmlContent': html_renderer(text),
-        'created_at': now.isoformat(),
-        'timeFormatted': now.strftime('%Y-%m-%d %H:%M:%S'),
-    }
+    post_id = str(uuid.uuid4())
+    created_at = now.isoformat()
+    html_content = html_renderer(text)
     with get_db() as db:
         db.execute(
             "INSERT INTO posts (id, text, htmlContent, created_at) VALUES (?, ?, ?, ?)",
-            (post['id'], post['text'], post['htmlContent'], post['created_at'])
+            (post_id, text, html_content, created_at)
         )
-    return post
+        attachment_rows = []
+        for position, att in enumerate(attachments or []):
+            att_id = str(uuid.uuid4())
+            db.execute(
+                '''
+                INSERT INTO attachments (
+                    id, post_id, kind, image_path, thumb_path, video_path,
+                    mime_image, mime_video, width, height, bytes, position, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    att_id, post_id, att['kind'], att['image_path'], att['thumb_path'],
+                    att.get('video_path'), att['mime_image'], att.get('mime_video'),
+                    att['width'], att['height'], att['bytes'], position, created_at,
+                )
+            )
+            attachment_rows.append({**att, 'id': att_id, 'position': position})
+    return {
+        'id': post_id,
+        'text': text,
+        'htmlContent': html_content,
+        'created_at': created_at,
+        'timeFormatted': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'attachment_rows': attachment_rows,
+    }
 
 
 def delete_post(post_id):
     with get_db() as db:
+        rows = db.execute(
+            "SELECT image_path, thumb_path, video_path FROM attachments WHERE post_id = ?",
+            (post_id,)
+        ).fetchall()
         cur = db.execute("DELETE FROM posts WHERE id = ?", (post_id,))
-    return cur.rowcount > 0
+    if cur.rowcount == 0:
+        return False, []
+    paths = [p for r in rows for p in (r['image_path'], r['thumb_path'], r['video_path']) if p]
+    return True, paths
 
 
 def delete_posts(post_ids):
     if not post_ids:
-        return 0
+        return 0, []
     placeholders = ','.join('?' for _ in post_ids)
     with get_db() as db:
+        rows = db.execute(
+            f"SELECT image_path, thumb_path, video_path FROM attachments WHERE post_id IN ({placeholders})",
+            tuple(post_ids)
+        ).fetchall()
         cur = db.execute(f"DELETE FROM posts WHERE id IN ({placeholders})", tuple(post_ids))
-    return cur.rowcount
+    paths = [p for r in rows for p in (r['image_path'], r['thumb_path'], r['video_path']) if p]
+    return cur.rowcount, paths
 
 
 def list_recent_posts(limit=10):
@@ -172,15 +225,56 @@ def list_recent_posts(limit=10):
         ).fetchall()
 
 
-def render_rss_item(row, post_url):
+def get_attachments_for_posts(post_ids, storage):
+    if not post_ids:
+        return {}
+    placeholders = ','.join('?' for _ in post_ids)
+    with get_db() as db:
+        rows = db.execute(
+            f'''SELECT id, post_id, kind, image_path, thumb_path, video_path,
+                       mime_image, mime_video, width, height, position
+                FROM attachments
+                WHERE post_id IN ({placeholders})
+                ORDER BY post_id, position''',
+            tuple(post_ids)
+        ).fetchall()
+    grouped = {pid: [] for pid in post_ids}
+    for r in rows:
+        urls = {
+            'image': storage.url_for(r['image_path']),
+            'thumb': storage.url_for(r['thumb_path']),
+        }
+        if r['video_path']:
+            urls['video'] = storage.url_for(r['video_path'])
+        grouped.setdefault(r['post_id'], []).append({
+            'id': r['id'],
+            'kind': r['kind'],
+            'urls': urls,
+            'mime_image': r['mime_image'],
+            'mime_video': r['mime_video'],
+            'width': r['width'],
+            'height': r['height'],
+        })
+    return grouped
+
+
+def render_rss_item(row, post_url, attachments=None, attachment_url_resolver=None):
     pub = datetime.fromisoformat(row['created_at']).strftime('%a, %d %b %Y %H:%M:%S GMT')
     title = xml_escape(row['text'][:100])
     link = xml_escape(post_url)
+    description = row['htmlContent']
+    if attachments and attachment_url_resolver:
+        media_html = []
+        for att in attachments:
+            img_url = attachment_url_resolver(att['urls']['thumb'])
+            media_html.append(f'<p><img src="{xml_escape(img_url)}" alt=""></p>')
+        if media_html:
+            description = description + '\n' + '\n'.join(media_html)
     return f'''    <item>
       <title>{title}</title>
       <link>{link}</link>
       <guid>{link}</guid>
-      <description><![CDATA[{row['htmlContent']}]]></description>
+      <description><![CDATA[{description}]]></description>
       <pubDate>{pub}</pubDate>
     </item>'''
 
