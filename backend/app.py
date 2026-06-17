@@ -26,7 +26,7 @@ from db import (
     serialize_post,
     set_setting,
 )
-from media import IMAGE_MIMES, VIDEO_MIMES, MediaError, detect_mime, process_image, process_video
+from media import IMAGE_MIMES, VIDEO_MIMES, MediaError, detect_mime, process_image, process_video, save_video_bytes, try_extract_motion_photo
 from storage import get_storage
 from web_helpers import (
     api_base_path,
@@ -53,8 +53,9 @@ TRUST_DEVICE_DAYS = 30
 app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 
-app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if SECRET_KEY:
@@ -176,8 +177,32 @@ def _process_attachments_from_request():
             if not isinstance(meta, dict):
                 raise MediaError('附件元信息格式错误')
             kind = meta.get('kind')
-            if kind not in ('image', 'live_photo'):
+            if kind not in ('image', 'live_photo', 'video'):
                 raise MediaError(f'未知附件类型 {kind}')
+
+            if kind == 'video':
+                video_file = request.files.get(f'file_{index}_image')
+                if video_file is None or not video_file.filename:
+                    raise MediaError(f'第 {index + 1} 个附件缺少视频')
+                video_mime = detect_mime(video_file)
+                if video_mime not in VIDEO_MIMES:
+                    raise MediaError(f'第 {index + 1} 个附件视频类型不支持: {video_mime}')
+                video_info = process_video(video_file, video_mime)
+                tmp_paths_to_cleanup.append(video_info['tmp'])
+                video_rel = storage.save(video_info['tmp'], video_info['ext'])
+                saved_rel_paths.append(video_rel)
+                records.append({
+                    'kind': 'video',
+                    'image_path': video_rel,
+                    'thumb_path': video_rel,
+                    'video_path': video_rel,
+                    'mime_image': video_info['mime'],
+                    'mime_video': video_info['mime'],
+                    'width': 0,
+                    'height': 0,
+                    'bytes': video_info['bytes'],
+                })
+                continue
 
             image_file = request.files.get(f'file_{index}_image')
             if image_file is None or not image_file.filename:
@@ -186,19 +211,32 @@ def _process_attachments_from_request():
             if image_mime not in IMAGE_MIMES:
                 raise MediaError(f'第 {index + 1} 个附件图片类型不支持: {image_mime}')
 
+            # Auto-promote a single-file image to live_photo if it has an
+            # embedded MP4 trailer (Google MotionPhoto / vivo 动态照片).
+            embedded_mp4 = None
+            if kind == 'image':
+                embedded_mp4 = try_extract_motion_photo(image_file)
+                if embedded_mp4:
+                    kind = 'live_photo'
+                    logger.info('motion photo detected, embedded mp4 size=%d', len(embedded_mp4))
+
             image_info = process_image(image_file, image_mime)
             tmp_paths_to_cleanup.extend([image_info['image_tmp'], image_info['thumb_tmp']])
 
             video_info = None
             if kind == 'live_photo':
-                video_file = request.files.get(f'file_{index}_video')
-                if video_file is None or not video_file.filename:
-                    raise MediaError(f'第 {index + 1} 个 Live Photo 缺少视频')
-                video_mime = detect_mime(video_file)
-                if video_mime not in VIDEO_MIMES:
-                    raise MediaError(f'第 {index + 1} 个 Live Photo 视频类型不支持: {video_mime}')
-                video_info = process_video(video_file, video_mime)
-                tmp_paths_to_cleanup.append(video_info['tmp'])
+                if embedded_mp4 is not None:
+                    video_info = save_video_bytes(embedded_mp4)
+                    tmp_paths_to_cleanup.append(video_info['tmp'])
+                else:
+                    video_file = request.files.get(f'file_{index}_video')
+                    if video_file is None or not video_file.filename:
+                        raise MediaError(f'第 {index + 1} 个 Live Photo 缺少视频')
+                    video_mime = detect_mime(video_file)
+                    if video_mime not in VIDEO_MIMES:
+                        raise MediaError(f'第 {index + 1} 个 Live Photo 视频类型不支持: {video_mime}')
+                    video_info = process_video(video_file, video_mime)
+                    tmp_paths_to_cleanup.append(video_info['tmp'])
 
             image_rel = storage.save(image_info['image_tmp'], image_info['image_ext'])
             saved_rel_paths.append(image_rel)

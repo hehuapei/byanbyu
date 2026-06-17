@@ -250,7 +250,13 @@ function handleResponse(r) {
     window.location.href = '/admin/login?next=/quick';
     return null;
   }
-  return r.json();
+  if (r.status === 413) {
+    return { success: false, error: '上传文件过大（服务端整体上限 500MB）' };
+  }
+  return r.text().then(function (t) {
+    try { return JSON.parse(t); }
+    catch (_) { return { success: false, error: '服务异常 (HTTP ' + r.status + ')' }; }
+  });
 }
 
 function submitPost() {
@@ -282,8 +288,9 @@ function submitPost() {
       showMsg(res.error || '发送失败', 'error');
     }
   })
-  .catch(function() {
-    showMsg('网络异常，请稍后重试', 'error');
+  .catch(function (err) {
+    console.error('submit failed:', err);
+    showMsg('上传失败: ' + ((err && err.message) || '网络异常'), 'error');
   })
   .finally(function() {
     isSubmitting = false;

@@ -124,7 +124,13 @@ addAttachBtn.addEventListener('click', function (e) {
 });
 function handleResponse(r) {
   if (r.status === 401) { window.location.href = '/admin/login'; return null; }
-  return r.json();
+  if (r.status === 413) {
+    return { success: false, error: '上传文件过大（服务端整体上限 500MB）' };
+  }
+  return r.text().then(function (t) {
+    try { return JSON.parse(t); }
+    catch (_) { return { success: false, error: '服务异常 (HTTP ' + r.status + ')' }; }
+  });
 }
 function escapeAttr(value) {
   return String(value).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -212,6 +218,10 @@ function submitPost() {
     } else {
       showMsg(res.error || '发布失败', 'error');
     }
+  })
+  .catch(function (err) {
+    console.error('submit failed:', err);
+    showMsg('上传失败: ' + ((err && err.message) || '网络异常'), 'error');
   })
   .finally(function() {
     submitBtn.disabled = false;

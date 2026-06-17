@@ -21,6 +21,23 @@
     return wrap;
   }
 
+  function renderVideo(att) {
+    var wrap = document.createElement('div');
+    wrap.className = 'bb-att bb-att-video';
+    var video = document.createElement('video');
+    video.src = att.urls.video || att.urls.image;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.preload = 'metadata';
+    wrap.appendChild(video);
+    var badge = document.createElement('span');
+    badge.className = 'bb-video-play';
+    badge.textContent = '▶';
+    wrap.appendChild(badge);
+    return wrap;
+  }
+
   function renderLivePhoto(att, useFull) {
     var wrap = document.createElement('div');
     wrap.className = 'bb-att bb-lp';
@@ -41,7 +58,10 @@
     grid.className = 'bb-attachments';
     grid.setAttribute('data-count', String(attachments.length));
     attachments.forEach(function (att, idx) {
-      var node = att.kind === 'live_photo' ? renderLivePhoto(att, useFull) : renderImage(att, useFull);
+      var node;
+      if (att.kind === 'live_photo') node = renderLivePhoto(att, useFull);
+      else if (att.kind === 'video') node = renderVideo(att);
+      else node = renderImage(att, useFull);
       node.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();

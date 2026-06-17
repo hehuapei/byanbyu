@@ -90,6 +90,14 @@
       if (window.bbLivePhoto && typeof window.bbLivePhoto.scan === 'function') {
         window.bbLivePhoto.scan(content);
       }
+    } else if (item.kind === 'video') {
+      var v = document.createElement('video');
+      v.src = item.urls.video || item.urls.image;
+      v.controls = true;
+      v.playsInline = true;
+      v.setAttribute('playsinline', '');
+      v.autoplay = true;
+      content.appendChild(v);
     } else {
       var img2 = document.createElement('img');
       img2.src = item.urls.image;
@@ -128,4 +136,11 @@
   }
 
   window.bbLightbox = { open: open, close: close };
+
+  // Block native long-press / right-click menu on all attachment media.
+  document.addEventListener('contextmenu', function (e) {
+    if (e.target && e.target.closest && e.target.closest('.bb-att, .bb-att-tile, .bb-lightbox')) {
+      e.preventDefault();
+    }
+  });
 })();

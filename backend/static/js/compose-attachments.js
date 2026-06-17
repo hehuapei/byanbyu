@@ -6,7 +6,7 @@
 (function () {
   var IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
   var VIDEO_TYPES = ['video/quicktime', 'video/mp4'];
-  var MAX_FILE_BYTES = 30 * 1024 * 1024;
+  var MAX_FILE_BYTES = 50 * 1024 * 1024;
 
   function classifyFile(file) {
     var t = (file.type || '').toLowerCase();
@@ -48,8 +48,8 @@
       items.forEach(function (item) {
         var tile = document.createElement('div');
         var paired = item.kind === 'live_photo';
-        var stray = item.kind === 'video';
-        tile.className = 'bb-att-tile' + (paired ? ' is-paired' : '') + (stray ? ' is-stray' : '');
+        var isVideo = item.kind === 'video';
+        tile.className = 'bb-att-tile' + (paired ? ' is-paired' : '') + (isVideo ? ' is-video' : '');
         tile.dataset.id = item.id;
 
         if (paired) {
@@ -64,7 +64,7 @@
           var img2 = document.createElement('img');
           img2.src = item.imageUrl;
           tile.appendChild(img2);
-        } else if (stray) {
+        } else if (isVideo) {
           var v = document.createElement('video');
           v.src = item.imageUrl;
           v.muted = true;
@@ -73,7 +73,7 @@
           tile.appendChild(v);
           var badge2 = document.createElement('span');
           badge2.className = 'tile-badge';
-          badge2.textContent = '需配同名图';
+          badge2.textContent = '视频';
           tile.appendChild(badge2);
         }
 
@@ -145,12 +145,17 @@
       for (var i = 0; i < fileList.length; i++) {
         var file = fileList[i];
         var kind = classifyFile(file);
+        console.log('[compose] file selected:',
+          'name=' + file.name,
+          'type=' + (file.type || '<none>'),
+          'size=' + (file.size / 1024 / 1024).toFixed(2) + 'MB',
+          'classified=' + kind);
         if (!kind) {
           showError('不支持的文件类型: ' + (file.name || ''));
           continue;
         }
         if (file.size > MAX_FILE_BYTES) {
-          showError((file.name || '文件') + ' 超过 30MB');
+          showError((file.name || '文件') + ' 超过 50MB（实际 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）');
           continue;
         }
         items.push({
@@ -179,19 +184,16 @@
     });
 
     function buildFormData(extra) {
-      var stray = items.filter(function (it) { return it.kind === 'video'; });
-      if (stray.length) {
-        showError('有视频没找到同名静态图，无法作为 Live Photo 发送，请补一张同名图或移除');
-        return null;
-      }
       var fd = new FormData();
       Object.keys(extra || {}).forEach(function (k) { fd.append(k, extra[k]); });
       var meta = items.map(function (it) {
-        return { kind: it.kind === 'live_photo' ? 'live_photo' : 'image' };
+        if (it.kind === 'live_photo') return { kind: 'live_photo' };
+        if (it.kind === 'video') return { kind: 'video' };
+        return { kind: 'image' };
       });
       fd.append('attachments_meta', JSON.stringify(meta));
       items.forEach(function (it, idx) {
-        fd.append('file_' + idx + '_image', it.image, it.image.name || ('image-' + idx));
+        fd.append('file_' + idx + '_image', it.image, it.image.name || ('file-' + idx));
         if (it.video) fd.append('file_' + idx + '_video', it.video, it.video.name || ('video-' + idx));
       });
       return fd;
@@ -215,4 +217,12 @@
   }
 
   window.bbCompose = { create: create };
+
+  // /quick doesn't load lightbox.js, so register the contextmenu blocker
+  // here too. Idempotent if both fire.
+  document.addEventListener('contextmenu', function (e) {
+    if (e.target && e.target.closest && e.target.closest('.bb-att, .bb-att-tile, .bb-lightbox')) {
+      e.preventDefault();
+    }
+  });
 })();

@@ -12,7 +12,7 @@ pillow_heif.register_heif_opener()
 logger = logging.getLogger(__name__)
 
 
-MAX_FILE_BYTES = 30 * 1024 * 1024  # 30 MB per file
+MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MB per file
 
 IMAGE_MIMES = {'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'}
 VIDEO_MIMES = {'video/quicktime', 'video/mp4'}
@@ -46,7 +46,7 @@ def _save_to_temp(file_storage, suffix: str) -> str:
                 chunk = file_storage.stream.read(1 << 20)
         size = os.path.getsize(tmp)
         if size > MAX_FILE_BYTES:
-            raise MediaError('单文件不能超过 30MB')
+            raise MediaError('单文件不能超过 50MB')
         return tmp
     except Exception:
         try:
@@ -135,4 +135,87 @@ def process_video(file_storage, mime: str):
         'ext': ext,
         'mime': mime,
         'bytes': os.path.getsize(tmp),
+    }
+
+
+def try_extract_motion_photo(file_storage) -> bytes | None:
+    """If the upload is a JPEG/HEIC with an embedded MP4 trailer
+    (Google MotionPhoto / Samsung Motion Photo / vivo 动态照片), return
+    the raw MP4 bytes. Otherwise return None.
+
+    Detection: scan the file for the 'ftyp' MP4 box marker. JPEG has no
+    native ftyp; any occurrence is the trailing video. HEIC has its own
+    ftyp at the start; the trailing video shows up as a later ftyp.
+
+    Stream position is restored before return.
+    """
+    stream = file_storage.stream
+    pos = stream.tell()
+    stream.seek(0)
+    data = stream.read()
+    stream.seek(pos)
+
+    if not data:
+        return None
+
+    head = data[:12]
+    is_jpeg = head[:2] == b'\xff\xd8'
+    is_heif = len(head) >= 12 and head[4:8] == b'ftyp' and head[8:12] in (
+        b'heic', b'heix', b'hevc', b'mif1', b'msf1', b'heim', b'heis'
+    )
+
+    # Diagnostic dump for failures we want to investigate.
+    def _diag(reason):
+        logger.debug('motion_photo: skip (%s) size=%d head=%s', reason, len(data), head[:12].hex())
+
+    if not (is_jpeg or is_heif):
+        _diag('not jpeg/heic')
+        return None
+
+    # Last 'ftyp' is the trailer (HEIC also has one at offset 4).
+    last_ftyp = data.rfind(b'ftyp')
+    if last_ftyp < 4:
+        _diag('no ftyp')
+        return None
+    if is_heif and last_ftyp == 4:
+        _diag('heif single ftyp')
+        return None
+
+    mp4_start = last_ftyp - 4
+    box_size = int.from_bytes(data[mp4_start:mp4_start + 4], 'big')
+    if not (8 < box_size < 128):
+        _diag(f'bad box size {box_size}')
+        return None
+
+    mp4_bytes = data[mp4_start:]
+    if len(mp4_bytes) < 1024:
+        _diag(f'mp4 too small {len(mp4_bytes)}')
+        return None
+
+    if len(mp4_bytes) > box_size + 8:
+        next_size = int.from_bytes(mp4_bytes[box_size:box_size + 4], 'big')
+        if next_size != 0 and (next_size < 8 or next_size > len(mp4_bytes) - box_size + 8):
+            _diag(f'bad next box size {next_size} after first box {box_size}')
+            return None
+
+    logger.info(
+        'motion_photo: extracted %d bytes from %d total (first ftyp=%d, last ftyp=%d)',
+        len(mp4_bytes), len(data), data.find(b'ftyp'), last_ftyp,
+    )
+    return mp4_bytes
+
+
+def save_video_bytes(mp4_bytes: bytes):
+    """Persist already-extracted MP4 bytes to a temp file. Returns the
+    same shape as process_video so callers can treat it uniformly."""
+    if len(mp4_bytes) > MAX_FILE_BYTES:
+        raise MediaError('Live Photo 内嵌视频超过 50MB')
+    tmp = _temp_path('.mp4')
+    with open(tmp, 'wb') as f:
+        f.write(mp4_bytes)
+    return {
+        'tmp': tmp,
+        'ext': '.mp4',
+        'mime': 'video/mp4',
+        'bytes': len(mp4_bytes),
     }

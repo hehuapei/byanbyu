@@ -266,6 +266,8 @@ def render_rss_item(row, post_url, attachments=None, attachment_url_resolver=Non
     if attachments and attachment_url_resolver:
         media_html = []
         for att in attachments:
+            if att.get('kind') == 'video':
+                continue  # RSS readers don't render inline video; skip
             img_url = attachment_url_resolver(att['urls']['thumb'])
             media_html.append(f'<p><img src="{xml_escape(img_url)}" alt=""></p>')
         if media_html:
