@@ -31,6 +31,10 @@
     return 'a' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
   }
 
+  function fileFingerprint(file) {
+    return [file.name || '', file.size, file.lastModified || 0].join('|');
+  }
+
   function makePreviewUrl(file) {
     try { return URL.createObjectURL(file); } catch (_) { return ''; }
   }
@@ -142,8 +146,17 @@
 
     function ingestFiles(fileList) {
       var added = false;
+      var existing = new Set();
+      items.forEach(function (it) {
+        if (it.image) existing.add(fileFingerprint(it.image));
+        if (it.video) existing.add(fileFingerprint(it.video));
+      });
       for (var i = 0; i < fileList.length; i++) {
         var file = fileList[i];
+        var fp = fileFingerprint(file);
+        if (existing.has(fp)) {
+          continue; // skip duplicate selection silently
+        }
         var kind = classifyFile(file);
         console.log('[compose] file selected:',
           'name=' + file.name,
@@ -164,6 +177,7 @@
           image: file,
           imageUrl: makePreviewUrl(file),
         });
+        existing.add(fp);
         added = true;
       }
       if (added) {
