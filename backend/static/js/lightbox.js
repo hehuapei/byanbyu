@@ -4,6 +4,7 @@
 (function () {
   var overlay = null;
   var state = { items: [], index: 0 };
+  var animating = false;
 
   function ensureOverlay() {
     if (overlay) return;
@@ -118,6 +119,11 @@
     state.index = Math.max(0, Math.min(index || 0, items.length - 1));
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    var content = overlay.querySelector('.bb-lightbox-content');
+    content.style.transition = '';
+    content.style.transform = '';
+    content.style.opacity = '';
+    animating = false;
     render();
   }
 
@@ -125,14 +131,40 @@
     if (!overlay) return;
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    overlay.querySelector('.bb-lightbox-content').innerHTML = '';
+    var content = overlay.querySelector('.bb-lightbox-content');
+    content.innerHTML = '';
+    content.style.transition = '';
+    content.style.transform = '';
+    content.style.opacity = '';
+    animating = false;
   }
 
   function step(delta) {
-    if (!state.items.length) return;
-    var n = state.items.length;
-    state.index = (state.index + delta + n) % n;
-    render();
+    if (!state.items.length || state.items.length <= 1) return;
+    if (animating) return;
+    animating = true;
+    var content = overlay.querySelector('.bb-lightbox-content');
+    var dir = delta > 0 ? 1 : -1;
+    var dur = 220;
+    // Phase 1: slide current out in the direction of motion
+    content.style.transform = 'translateX(' + (-dir * 30) + 'vw)';
+    content.style.opacity = '0';
+    setTimeout(function () {
+      // Phase 2: jump to opposite side, no transition, swap content
+      var n = state.items.length;
+      state.index = (state.index + delta + n) % n;
+      content.style.transition = 'none';
+      content.style.transform = 'translateX(' + (dir * 30) + 'vw)';
+      content.style.opacity = '0';
+      render();
+      // Force layout so the next style change animates
+      void content.offsetWidth;
+      // Phase 3: slide in to home
+      content.style.transition = '';
+      content.style.transform = 'translateX(0)';
+      content.style.opacity = '1';
+      setTimeout(function () { animating = false; }, dur);
+    }, dur);
   }
 
   window.bbLightbox = { open: open, close: close };
