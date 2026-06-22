@@ -5,6 +5,11 @@
   var overlay = null;
   var state = { items: [], index: 0 };
   var animating = false;
+  var zoom = { scale: 1, x: 0, y: 0 };
+  var activePointers = new Map();
+  var pinchStart = null;
+  var MIN_SCALE = 1;
+  var MAX_SCALE = 5;
 
   function ensureOverlay() {
     if (overlay) return;
@@ -41,6 +46,10 @@
     var swipeStartX = null;
     var swipeStartY = null;
     var swipeStartTime = 0;
+    var panStartX = null;
+    var panStartY = null;
+    var panBaseX = 0;
+    var panBaseY = 0;
     var suppressNextClick = false;
     overlay.addEventListener('click', function (e) {
       if (suppressNextClick) {
@@ -51,11 +60,77 @@
     });
     overlay.addEventListener('pointerdown', function (e) {
       if (e.target.closest('.bb-lightbox-btn')) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      overlay.setPointerCapture && overlay.setPointerCapture(e.pointerId);
+
+      if (activePointers.size === 2) {
+        pinchStart = getPinchState();
+        pinchStart.baseScale = zoom.scale;
+        pinchStart.baseX = zoom.x;
+        pinchStart.baseY = zoom.y;
+        panStartX = null;
+        swipeStartX = null;
+        suppressNextClick = true;
+        return;
+      }
+
+      if (zoom.scale > 1.01) {
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panBaseX = zoom.x;
+        panBaseY = zoom.y;
+        swipeStartX = null;
+        return;
+      }
+
       swipeStartX = e.clientX;
       swipeStartY = e.clientY;
       swipeStartTime = Date.now();
     });
-    overlay.addEventListener('pointerup', function (e) {
+    overlay.addEventListener('pointermove', function (e) {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pinchStart && activePointers.size >= 2) {
+        var now = getPinchState();
+        if (!now || !pinchStart.distance) return;
+        var nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchStart.baseScale * (now.distance / pinchStart.distance)));
+        var ratio = nextScale / pinchStart.baseScale;
+        zoom.x = now.cx - window.innerWidth / 2 - ((pinchStart.cx - window.innerWidth / 2) - pinchStart.baseX) * ratio;
+        zoom.y = now.cy - window.innerHeight / 2 - ((pinchStart.cy - window.innerHeight / 2) - pinchStart.baseY) * ratio;
+        zoom.scale = nextScale;
+        if (zoom.scale <= 1.01) {
+          zoom.scale = 1;
+          zoom.x = 0;
+          zoom.y = 0;
+        }
+        var content = overlay.querySelector('.bb-lightbox-content');
+        content.style.transition = 'transform 0.04s linear, opacity 0.18s linear';
+        applyContentTransform();
+        return;
+      }
+
+      if (panStartX == null) return;
+      zoom.x = panBaseX + (e.clientX - panStartX);
+      zoom.y = panBaseY + (e.clientY - panStartY);
+      applyContentTransform();
+    });
+    function endPointer(e) {
+      activePointers.delete(e.pointerId);
+      if (pinchStart) {
+        pinchStart = null;
+        panStartX = null;
+        swipeStartX = null;
+        suppressNextClick = true;
+        return;
+      }
+      if (panStartX != null) {
+        var pdx = e.clientX - panStartX;
+        var pdy = e.clientY - panStartY;
+        panStartX = null;
+        if (Math.abs(pdx) > 4 || Math.abs(pdy) > 4) suppressNextClick = true;
+        return;
+      }
       if (swipeStartX == null) return;
       var dx = e.clientX - swipeStartX;
       var dy = e.clientY - swipeStartY;
@@ -66,8 +141,70 @@
       if (dt < 600 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         step(dx < 0 ? 1 : -1);
       }
-    });
-    overlay.addEventListener('pointercancel', function () { swipeStartX = null; });
+    }
+    overlay.addEventListener('pointerup', endPointer);
+    overlay.addEventListener('pointercancel', endPointer);
+    overlay.addEventListener('wheel', function (e) {
+      if (!overlay.classList.contains('open') || animating) return;
+      if (e.target.closest('.bb-lightbox-btn')) return;
+      e.preventDefault();
+      applyWheelZoom(e);
+    }, { passive: false });
+  }
+
+  function resetZoom() {
+    zoom.scale = 1;
+    zoom.x = 0;
+    zoom.y = 0;
+    var content = overlay && overlay.querySelector('.bb-lightbox-content');
+    if (content) content.style.transition = '';
+    applyContentTransform();
+  }
+
+  function applyContentTransform() {
+    var content = overlay && overlay.querySelector('.bb-lightbox-content');
+    if (!content) return;
+    content.style.transform = 'translate(' + zoom.x + 'px, ' + zoom.y + 'px) scale(' + zoom.scale + ')';
+    content.classList.toggle('is-zoomed', zoom.scale > 1.01);
+  }
+
+  function applyWheelZoom(e) {
+    var content = overlay.querySelector('.bb-lightbox-content');
+    var oldScale = zoom.scale;
+    var factor = Math.exp(-e.deltaY * 0.002);
+    var nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * factor));
+    if (Math.abs(nextScale - oldScale) < 0.001) return;
+
+    var centerX = window.innerWidth / 2;
+    var centerY = window.innerHeight / 2;
+    var pointerX = e.clientX - centerX;
+    var pointerY = e.clientY - centerY;
+    var ratio = nextScale / oldScale;
+
+    zoom.x = pointerX - (pointerX - zoom.x) * ratio;
+    zoom.y = pointerY - (pointerY - zoom.y) * ratio;
+    zoom.scale = nextScale;
+    if (zoom.scale <= 1.01) {
+      zoom.scale = 1;
+      zoom.x = 0;
+      zoom.y = 0;
+    }
+    content.style.transition = 'transform 0.08s ease-out, opacity 0.18s linear';
+    applyContentTransform();
+  }
+
+  function getPinchState() {
+    var points = Array.from(activePointers.values());
+    if (points.length < 2) return null;
+    var a = points[0];
+    var b = points[1];
+    var dx = b.x - a.x;
+    var dy = b.y - a.y;
+    return {
+      cx: (a.x + b.x) / 2,
+      cy: (a.y + b.y) / 2,
+      distance: Math.sqrt(dx * dx + dy * dy),
+    };
   }
 
   function render() {
@@ -110,6 +247,7 @@
     overlay.querySelector('.bb-lightbox-counter').textContent = multi ? (state.index + 1) + ' / ' + state.items.length : '';
     overlay.querySelector('.bb-lightbox-prev').style.display = multi ? '' : 'none';
     overlay.querySelector('.bb-lightbox-next').style.display = multi ? '' : 'none';
+    if (!animating) applyContentTransform();
   }
 
   function open(items, index) {
@@ -121,9 +259,11 @@
     document.body.style.overflow = 'hidden';
     var content = overlay.querySelector('.bb-lightbox-content');
     content.style.transition = '';
-    content.style.transform = '';
     content.style.opacity = '';
     animating = false;
+    activePointers.clear();
+    pinchStart = null;
+    resetZoom();
     render();
   }
 
@@ -134,14 +274,17 @@
     var content = overlay.querySelector('.bb-lightbox-content');
     content.innerHTML = '';
     content.style.transition = '';
-    content.style.transform = '';
     content.style.opacity = '';
     animating = false;
+    activePointers.clear();
+    pinchStart = null;
+    resetZoom();
   }
 
   function step(delta) {
     if (!state.items.length || state.items.length <= 1) return;
     if (animating) return;
+    resetZoom();
     animating = true;
     var content = overlay.querySelector('.bb-lightbox-content');
     var dir = delta > 0 ? 1 : -1;

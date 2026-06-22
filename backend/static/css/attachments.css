@@ -206,9 +206,12 @@
   max-width: calc(100vw - 80px);
   max-height: calc(100vh - 80px);
   cursor: default;
+  transform-origin: center center;
   transition: transform 0.22s cubic-bezier(.4, 0, .2, 1), opacity 0.18s linear;
   will-change: transform, opacity;
 }
+.bb-lightbox-content.is-zoomed { cursor: grab; }
+.bb-lightbox-content.is-zoomed:active { cursor: grabbing; }
 .bb-lightbox-content img,
 .bb-lightbox-content video {
   max-width: calc(100vw - 80px);
